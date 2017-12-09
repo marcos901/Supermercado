@@ -47,6 +47,10 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.awt.event.ItemEvent;
 
 public class Cartao extends JFrame {
@@ -61,7 +65,8 @@ public class Cartao extends JFrame {
 	private JTextField txtParcela;
 	private double parcela = 0.0;
 	private String[][] compra;
-	private int item;
+	private int item, idFuncionario, idVenda;
+	private String hora2;
 
 	public Cartao(String pcompra[][], String pvalorTotal, int pItem) {
 		setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
@@ -146,6 +151,9 @@ public class Cartao extends JFrame {
 
 			@Override
 			public void actionPerformed(ActionEvent e) {
+				salvarCompra();
+				pegaIdVenda();
+				salvarProdutos();
 				gerarPdfDebito();
 				JOptionPane.showMessageDialog(null, "Compra realizada com sucesso");
 				setVisible(false);
@@ -157,6 +165,9 @@ public class Cartao extends JFrame {
 		btnPagarAVista.getActionMap().put("evento", new AbstractAction() {
 			@Override
 			public void actionPerformed(ActionEvent e) {
+				salvarCompra();
+				pegaIdVenda();
+				salvarProdutos();
 				gerarPdfDebito();
 				JOptionPane.showMessageDialog(null, "Compra realizada com sucesso");
 				setVisible(false);
@@ -168,6 +179,9 @@ public class Cartao extends JFrame {
 			@Override
 			public void actionPerformed(ActionEvent e) {
 				if (cmbParcelas.getSelectedIndex() != -1) {
+					salvarCompra();
+					pegaIdVenda();
+					salvarProdutos();
 					gerarPdfCredito();
 					JOptionPane.showMessageDialog(null, "Compra realizada com sucesso");
 					setVisible(false);
@@ -184,6 +198,9 @@ public class Cartao extends JFrame {
 			@Override
 			public void actionPerformed(ActionEvent e) {
 				if (cmbParcelas.getSelectedIndex() != -1) {
+					salvarCompra();
+					pegaIdVenda();
+					salvarProdutos();
 					gerarPdfCredito();
 					JOptionPane.showMessageDialog(null, "Compra realizada com sucesso");
 					setVisible(false);
@@ -450,6 +467,7 @@ public class Cartao extends JFrame {
 
 		SimpleDateFormat formata = new SimpleDateFormat(hora);
 		hora1 = formata.format(agora);
+		hora2 = hora1;
 		return hora1;
 	}
 
@@ -458,6 +476,17 @@ public class Cartao extends JFrame {
 		String data1;
 		java.util.Date agora = new java.util.Date();
 
+		SimpleDateFormat formata = new SimpleDateFormat(data);
+		data1 = formata.format(agora);
+
+		return data1;
+	}
+	
+	public String pegaDataParaBancoDeDados() {
+		String data = "yyyy-MM-dd";
+		String data1;
+		java.util.Date agora = new java.util.Date();
+		;
 		SimpleDateFormat formata = new SimpleDateFormat(data);
 		data1 = formata.format(agora);
 
@@ -484,5 +513,137 @@ public class Cartao extends JFrame {
 		String valorConv = doubleformat.format(valor);
 		
 		return valorConv;
+	}
+	
+	public void salvarCompra() {
+		try {
+			pegaIdFuncionario();
+			pegaHora();
+			// Procura por uma classe no projeto
+			Class.forName("com.mysql.jdbc.Driver");
+
+			// Cria uma variavel de conexão (local do banco, usuario, senha)
+			// Connection tem q ser a do .sql
+			Connection con = DriverManager.getConnection("jdbc:mysql://localhost/supermercado", "root", "");
+
+			// Cria a string de inserção no banco
+			String query = "INSERT INTO vendas (id_funcionario, data, hora, metodo_pagamento, valor_total) VALUES(?,?,?,?,?)";
+
+			// Cria o comando
+			// PreparedStatement tem q ser a do .sql
+			PreparedStatement stmt = con.prepareStatement(query);
+
+			// Seta os valores na string de inserção
+			stmt.setInt(1, idFuncionario);
+			stmt.setString(2, pegaDataParaBancoDeDados());
+			stmt.setString(3, hora2);
+			stmt.setString(4, "Dinheiro");
+			stmt.setString(5, compra[0][5]);
+			
+
+			// Executa o comando no banco de dados
+			stmt.executeUpdate();
+
+			// Fecha comando e conexão
+			stmt.close();
+			con.close();
+
+		} catch (Exception e) {
+			System.out.println("Erro: " + e);
+		}
+	}
+
+	public void pegaIdFuncionario() {
+		try {
+
+			Class.forName("com.mysql.jdbc.Driver");
+
+			Connection con = DriverManager.getConnection("jdbc:mysql://localhost/supermercado", "root", "");
+
+			String query = "SELECT * FROM funcionarios";
+
+			PreparedStatement stmt = con.prepareStatement(query);
+
+			ResultSet rs = stmt.executeQuery();
+
+			while (rs.next()) {
+
+				if (rs.getString("nome").equals(compra[0][6])) {
+					idFuncionario = rs.getInt("id");
+				}
+
+			}
+
+			con.close();
+			stmt.close();
+			rs.close();
+
+		} catch (Exception e) {
+			System.out.println("Erro: " + e);
+		}
+	}
+
+	public void salvarProdutos() {
+		try {
+			pegaIdFuncionario();
+			
+			for (int i = 0; i < compra.length; i++) {
+				// Procura por uma classe no projeto
+				Class.forName("com.mysql.jdbc.Driver");
+
+				// Cria uma variavel de conexão (local do banco, usuario, senha)
+				// Connection tem q ser a do .sql
+				Connection con = DriverManager.getConnection("jdbc:mysql://localhost/supermercado", "root", "");
+
+				// Cria a string de inserção no banco
+				String query = "INSERT INTO produtos_vendas (id_produto, id_venda, quantidade) VALUES(?,?,?)";
+
+				// Cria o comando
+				// PreparedStatement tem q ser a do .sql
+				PreparedStatement stmt = con.prepareStatement(query);
+
+				// Seta os valores na string de inserção
+				stmt.setInt(1, Integer.parseInt(compra[i][1]));
+				stmt.setInt(2, idVenda);
+				stmt.setInt(3, Integer.parseInt(compra[i][3]));
+
+				// Executa o comando no banco de dados
+				stmt.executeUpdate();
+
+				// Fecha comando e conexão
+				stmt.close();
+				con.close();
+			}
+			
+
+		} catch (Exception e) {
+			System.out.println("Erro: " + e);
+		}
+	}
+
+	public void pegaIdVenda() {
+		try {
+			
+			Class.forName("com.mysql.jdbc.Driver");
+
+			Connection con = DriverManager.getConnection("jdbc:mysql://localhost/supermercado", "root", "");
+			
+			String query = "SELECT * FROM vendas";
+			PreparedStatement stmt = con.prepareStatement(query);
+			ResultSet rs = stmt.executeQuery();
+			
+			while (rs.next()) {
+				if (rs.getDate("data").toString().equals(pegaDataParaBancoDeDados()) && rs.getTime("hora").toString().equals(hora2)) {
+					idVenda = rs.getInt("id");		
+				}	
+			}
+			
+			con.close();
+			stmt.close();
+			rs.close();
+
+		} catch (Exception e) {
+			System.out.println("Erro: " + e);
+		}
 	}
 }
